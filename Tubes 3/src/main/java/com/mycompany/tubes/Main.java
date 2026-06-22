@@ -1,6 +1,11 @@
 package com.mycompany.tubes;
 
-import java.util.*;
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.text.NumberFormat;
+import java.util.ArrayList;
+import java.util.Locale;
 
 public class Main {
 
@@ -9,58 +14,14 @@ public class Main {
     static ArrayList<Meja> daftarMeja = new ArrayList<>();
     static ArrayList<Pesanan> daftarPesananAktif = new ArrayList<>();
 
+    private static JFrame frame;
+    private static CardLayout cardLayout;
+    private static JPanel cardPanel;
+    private static Pengguna penggunaAktif;
+
     public static void main(String[] args) {
-        Scanner input = new Scanner(System.in);
-        siapkanDataAwal(); 
-
-        boolean isAplikasiBerjalan = true;
-
-        while (isAplikasiBerjalan) {
-            System.out.println("\n==============================================");
-            System.out.println("   SISTEM INFORMASI KAFE HALLO BURJOIS        ");
-            System.out.println("==============================================");
-            System.out.println("1. Login");
-            System.out.println("0. Keluar Aplikasi");
-            System.out.print("Pilih menu (0/1): ");
-            
-            int pilihanUtama = input.nextInt();
-            input.nextLine();
-
-            if (pilihanUtama == 1) {
-                System.out.println("\n--- SILAKAN LOGIN ---");
-                System.out.print("Username : ");
-                String usInput = input.nextLine();
-                System.out.print("Password : ");
-                String pwInput = input.nextLine();
-
-                Pengguna akunLogin = prosesLogin(usInput, pwInput);
-
-                if (akunLogin != null) {
-                    System.out.println("\n[SUKSES] Login Berhasil! Selamat datang, " + akunLogin.nama + ".");
-                    
-                    if (akunLogin instanceof Pelanggan) {
-                        menuPelanggan(input, (Pelanggan) akunLogin); 
-                    } else if (akunLogin instanceof Kasir) {
-                        menuKasir(input, (Kasir) akunLogin);
-                    } else if (akunLogin instanceof Waiter) {
-                        menuWaiter(input, (Waiter) akunLogin);
-                    } else if (akunLogin instanceof Owner) {
-                        menuOwner(input, (Owner) akunLogin);
-                    }
-                    
-                } else {
-                    System.out.println("\n[GAGAL] Username atau Password salah! Silakan coba lagi.");
-                }
-
-            } else if (pilihanUtama == 0) {
-                isAplikasiBerjalan = false;
-                System.out.println("\nSistem dimatikan. Terima kasih!");
-            } else {
-                System.out.println("\n[!] Pilihan tidak valid.");
-            }
-        }
-        
-        input.close();
+        siapkanDataAwal();
+        SwingUtilities.invokeLater(Main::tampilkanGUI);
     }
 
     static Pengguna prosesLogin(String username, String password) {
@@ -88,218 +49,755 @@ public class Main {
         daftarMeja.add(new Meja(3, 6));
     }
 
-    static void menuPelanggan(Scanner input, Pelanggan pel) {
-        boolean isAktif = true;
-        while (isAktif) {
-            System.out.println("\n--- MENU PELANGGAN (" + pel.nama + ") ---");
-            System.out.println("1. Buat Pesanan Baru");
-            System.out.println("2. Booking Meja (Reservasi)");
-            System.out.println("0. Logout");
-            System.out.print("Pilih aksi (0-2): ");
-            int aksi = input.nextInt();
-            input.nextLine();
+    // ===================== GUI UTAMA =====================
 
-            if (aksi == 1) {
-                Pesanan pesananBaru = new Pesanan(pel);
-                boolean nambahMenu = true;
+    private static void tampilkanGUI() {
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception ignored) {
+        }
 
-                while (nambahMenu) {
-                    System.out.println("\n--- DAFTAR MENU HALLO BURJOIS ---");
-                    for (int i = 0; i < daftarMenu.size(); i++) {
-                        System.out.println((i + 1) + ". " + daftarMenu.get(i).getNamaMenu() + " - Rp" + daftarMenu.get(i).getHarga());
-                    }
-                    System.out.println("0. Selesai Memesan");
-                    System.out.print("Pilih menu (angka): ");
-                    int pilMenu = input.nextInt();
-                    input.nextLine();
+        frame = new JFrame("Sistem Informasi Kafe Hallo Burjois");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(900, 620);
+        frame.setMinimumSize(new Dimension(820, 560));
+        frame.setLocationRelativeTo(null);
 
-                    if (pilMenu > 0 && pilMenu <= daftarMenu.size()) {
-                        Menu menuDipilih = daftarMenu.get(pilMenu - 1);
-                        System.out.print("Berapa porsi? ");
-                        int qty = input.nextInt();
-                        input.nextLine();
-                        System.out.print("Catatan (opsional): ");
-                        String cat = input.nextLine();
+        cardLayout = new CardLayout();
+        cardPanel = new JPanel(cardLayout);
 
-                        itemPesanan item = new itemPesanan(menuDipilih, qty, cat);
-                        pesananBaru.tambahItem(item);
-                        System.out.println(">> " + menuDipilih.getNamaMenu() + " ditambahkan ke pesanan!");
-                    } else if (pilMenu == 0) {
-                        nambahMenu = false;
-                    } else {
-                        System.out.println("Pilihan tidak valid!");
-                    }
+        cardPanel.add(buatPanelLogin(), "login");
+        cardPanel.add(buatPanelPelanggan(), "pelanggan");
+        cardPanel.add(buatPanelKasir(), "kasir");
+        cardPanel.add(buatPanelWaiter(), "waiter");
+        cardPanel.add(buatPanelOwner(), "owner");
+
+        frame.setContentPane(cardPanel);
+        cardLayout.show(cardPanel, "login");
+        frame.setVisible(true);
+    }
+
+    private static JPanel buatPanelDasar(String judul, String subjudul) {
+        JPanel panel = new JPanel(new BorderLayout(0, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        JPanel header = new JPanel(new GridLayout(2, 1));
+        header.add(new JLabel(judul));
+        header.add(new JLabel(subjudul));
+        panel.add(header, BorderLayout.NORTH);
+
+        return panel;
+    }
+
+    private static JButton buatTombol(String teks, boolean utama) {
+        return new JButton(teks);
+    }
+
+    private static void navigasiKeLogin() {
+        penggunaAktif = null;
+        cardLayout.show(cardPanel, "login");
+    }
+
+    private static String formatRupiah(double angka) {
+        NumberFormat nf = NumberFormat.getCurrencyInstance(new Locale("id", "ID"));
+        nf.setMaximumFractionDigits(0);
+        return nf.format(angka);
+    }
+
+    // ===================== LOGIN =====================
+
+    private static JPanel buatPanelLogin() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.gridwidth = 2;
+        panel.add(new JLabel("SISTEM INFORMASI KAFE HALLO BURJOIS"), gbc);
+
+        gbc.gridy = 1;
+        panel.add(new JLabel("Silakan login"), gbc);
+
+        gbc.gridwidth = 1;
+        gbc.gridy = 2;
+        gbc.gridx = 0;
+        panel.add(new JLabel("Username:"), gbc);
+
+        gbc.gridx = 1;
+        JTextField tfUser = new JTextField(15);
+        panel.add(tfUser, gbc);
+
+        gbc.gridy = 3;
+        gbc.gridx = 0;
+        panel.add(new JLabel("Password:"), gbc);
+
+        gbc.gridx = 1;
+        JPasswordField tfPass = new JPasswordField(15);
+        panel.add(tfPass, gbc);
+
+        gbc.gridy = 4;
+        gbc.gridx = 0;
+        gbc.gridwidth = 2;
+        JPanel aksi = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
+        JButton btnLogin = buatTombol("Login", true);
+        JButton btnKeluar = buatTombol("Keluar", false);
+        aksi.add(btnLogin);
+        aksi.add(btnKeluar);
+        panel.add(aksi, gbc);
+
+        btnLogin.addActionListener(e -> {
+            String user = tfUser.getText().trim();
+            String pass = new String(tfPass.getPassword());
+            Pengguna akun = prosesLogin(user, pass);
+            if (akun != null) {
+                penggunaAktif = akun;
+                tfPass.setText("");
+                JOptionPane.showMessageDialog(frame,
+                        "Login berhasil! Selamat datang, " + akun.nama + ".",
+                        "Sukses", JOptionPane.INFORMATION_MESSAGE);
+                if (akun instanceof Pelanggan) {
+                    cardLayout.show(cardPanel, "pelanggan");
+                } else if (akun instanceof Kasir) {
+                    cardLayout.show(cardPanel, "kasir");
+                } else if (akun instanceof Waiter) {
+                    cardLayout.show(cardPanel, "waiter");
+                } else if (akun instanceof Owner) {
+                    cardLayout.show(cardPanel, "owner");
                 }
+            } else {
+                JOptionPane.showMessageDialog(frame,
+                        "Username atau password salah!",
+                        "Login Gagal", JOptionPane.ERROR_MESSAGE);
+            }
+        });
 
-                if (!pesananBaru.getDaftarItem().isEmpty()) {
-                    daftarPesananAktif.add(pesananBaru);
-                    System.out.println("\n[SUKSES] Pesanan berhasil dibuat dengan ID: " + pesananBaru.getIdPesanan());
-                    System.out.println("Total Tagihan: Rp" + pesananBaru.hitungTotal());
-                } else {
-                    System.out.println("Pesanan dibatalkan (Kosong).");
+        btnKeluar.addActionListener(e -> System.exit(0));
+        tfPass.addActionListener(e -> btnLogin.doClick());
+
+        return panel;
+    }
+
+    // ===================== PELANGGAN =====================
+
+    private static JPanel buatPanelPelanggan() {
+        JPanel panel = buatPanelDasar("Menu Pelanggan",
+                "Pesan makanan atau booking meja di Hallo Burjois");
+
+        JPanel konten = new JPanel(new GridLayout(1, 2, 10, 0));
+
+        JPanel kartuPesanan = buatKartuAksi("Buat Pesanan Baru",
+                "Pilih menu, tentukan porsi, lalu kirim pesanan ke dapur.");
+        JButton btnPesanan = buatTombol("Buat Pesanan", true);
+        kartuPesanan.add(btnPesanan, BorderLayout.SOUTH);
+
+        JPanel kartuReservasi = buatKartuAksi("Booking Meja",
+                "Lihat ketersediaan meja dan reservasi untuk waktu kedatangan.");
+        JButton btnReservasi = buatTombol("Booking Meja", true);
+        kartuReservasi.add(btnReservasi, BorderLayout.SOUTH);
+
+        konten.add(kartuPesanan);
+        konten.add(kartuReservasi);
+        panel.add(konten, BorderLayout.CENTER);
+
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JButton btnLogout = buatTombol("Logout", false);
+        footer.add(btnLogout);
+        panel.add(footer, BorderLayout.SOUTH);
+
+        btnPesanan.addActionListener(e -> {
+            if (penggunaAktif instanceof Pelanggan pel) {
+                tampilkanDialogPesanan(pel);
+            }
+        });
+
+        btnReservasi.addActionListener(e -> {
+            if (penggunaAktif instanceof Pelanggan pel) {
+                tampilkanDialogReservasi(pel);
+            }
+        });
+
+        btnLogout.addActionListener(e -> {
+            penggunaAktif.logout();
+            navigasiKeLogin();
+        });
+
+        return panel;
+    }
+
+    private static JPanel buatKartuAksi(String judul, String deskripsi) {
+        JPanel kartu = new JPanel(new BorderLayout(0, 8));
+        kartu.setBorder(BorderFactory.createTitledBorder(judul));
+
+        JTextArea area = new JTextArea(deskripsi);
+        area.setLineWrap(true);
+        area.setWrapStyleWord(true);
+        area.setEditable(false);
+
+        kartu.add(area, BorderLayout.CENTER);
+        return kartu;
+    }
+
+    private static void tampilkanDialogPesanan(Pelanggan pel) {
+        JDialog dialog = new JDialog(frame, "Buat Pesanan Baru", true);
+        dialog.setSize(720, 520);
+        dialog.setLocationRelativeTo(frame);
+        dialog.setLayout(new BorderLayout(12, 12));
+
+        Pesanan pesananBaru = new Pesanan(pel);
+
+        String[] kolomMenu = {"No", "Menu", "Kategori", "Harga"};
+        DefaultTableModel modelMenu = new DefaultTableModel(kolomMenu, 0) {
+            @Override
+            public boolean isCellEditable(int row, int col) {
+                return false;
+            }
+        };
+        for (int i = 0; i < daftarMenu.size(); i++) {
+            Menu m = daftarMenu.get(i);
+            modelMenu.addRow(new Object[]{i + 1, m.getNamaMenu(), m.getKategori(), formatRupiah(m.getHarga())});
+        }
+        JTable tabelMenu = new JTable(modelMenu);
+
+        String[] kolomKeranjang = {"Menu", "Porsi", "Catatan", "Subtotal"};
+        DefaultTableModel modelKeranjang = new DefaultTableModel(kolomKeranjang, 0) {
+            @Override
+            public boolean isCellEditable(int row, int col) {
+                return false;
+            }
+        };
+        JTable tabelKeranjang = new JTable(modelKeranjang);
+
+        JLabel lblTotal = new JLabel("Total: Rp0");
+
+        Runnable refreshTotal = () -> {
+            lblTotal.setText("Total: " + formatRupiah(pesananBaru.hitungTotal()));
+        };
+
+        JPanel form = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
+        SpinnerNumberModel spinnerModel = new SpinnerNumberModel(1, 1, 99, 1);
+        JSpinner spnQty = new JSpinner(spinnerModel);
+        spnQty.setPreferredSize(new Dimension(60, 30));
+        JTextField tfCatatan = new JTextField(18);
+        form.add(new JLabel("Porsi:"));
+        form.add(spnQty);
+        form.add(new JLabel("Catatan:"));
+        form.add(tfCatatan);
+
+        JButton btnTambah = buatTombol("Tambah ke Pesanan", true);
+        form.add(btnTambah);
+
+        btnTambah.addActionListener(ev -> {
+            int baris = tabelMenu.getSelectedRow();
+            if (baris < 0) {
+                JOptionPane.showMessageDialog(dialog, "Pilih menu terlebih dahulu!", "Peringatan",
+                        JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            Menu menuDipilih = daftarMenu.get(baris);
+            int qty = (Integer) spnQty.getValue();
+            String cat = tfCatatan.getText().trim();
+            if (cat.isEmpty()) {
+                cat = "-";
+            }
+            itemPesanan item = new itemPesanan(menuDipilih, qty, cat);
+            pesananBaru.tambahItem(item);
+            modelKeranjang.addRow(new Object[]{
+                    menuDipilih.getNamaMenu(), qty, cat, formatRupiah(item.hitungSubtotal())
+            });
+            refreshTotal.run();
+            tfCatatan.setText("");
+            spnQty.setValue(1);
+        });
+
+        JPanel bawah = new JPanel(new BorderLayout());
+        bawah.add(lblTotal, BorderLayout.WEST);
+
+        JPanel aksiBawah = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        JButton btnBatal = buatTombol("Batal", false);
+        JButton btnSelesai = buatTombol("Kirim Pesanan", true);
+        aksiBawah.add(btnBatal);
+        aksiBawah.add(btnSelesai);
+        bawah.add(aksiBawah, BorderLayout.EAST);
+
+        btnBatal.addActionListener(ev -> dialog.dispose());
+
+        btnSelesai.addActionListener(ev -> {
+            if (pesananBaru.getDaftarItem().isEmpty()) {
+                JOptionPane.showMessageDialog(dialog, "Pesanan kosong. Tambahkan menu terlebih dahulu.",
+                        "Peringatan", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            daftarPesananAktif.add(pesananBaru);
+            JOptionPane.showMessageDialog(dialog,
+                    "Pesanan berhasil dibuat!\nID: " + pesananBaru.getIdPesanan()
+                            + "\nTotal: " + formatRupiah(pesananBaru.hitungTotal()),
+                    "Sukses", JOptionPane.INFORMATION_MESSAGE);
+            dialog.dispose();
+        });
+
+        JPanel atas = new JPanel(new BorderLayout(0, 4));
+        atas.add(new JLabel("Daftar Menu Hallo Burjois"), BorderLayout.NORTH);
+        atas.add(new JScrollPane(tabelMenu), BorderLayout.CENTER);
+
+        JPanel tengah = new JPanel(new BorderLayout(0, 4));
+        tengah.add(form, BorderLayout.NORTH);
+        tengah.add(new JLabel("Keranjang Pesanan"), BorderLayout.CENTER);
+        tengah.add(new JScrollPane(tabelKeranjang), BorderLayout.SOUTH);
+        tengah.setPreferredSize(new Dimension(0, 180));
+
+        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, atas, tengah);
+        split.setResizeWeight(0.5);
+        split.setDividerLocation(220);
+
+        dialog.add(split, BorderLayout.CENTER);
+        dialog.add(bawah, BorderLayout.SOUTH);
+        dialog.setVisible(true);
+    }
+
+    private static void tampilkanDialogReservasi(Pelanggan pel) {
+        JDialog dialog = new JDialog(frame, "Booking Meja", true);
+        dialog.setSize(520, 420);
+        dialog.setLocationRelativeTo(frame);
+        dialog.setLayout(new BorderLayout(12, 12));
+
+        String[] kolom = {"No Meja", "Kapasitas", "Status"};
+        DefaultTableModel model = new DefaultTableModel(kolom, 0) {
+            @Override
+            public boolean isCellEditable(int row, int col) {
+                return false;
+            }
+        };
+        for (Meja m : daftarMeja) {
+            String status = m.getIsTersedia() ? "Tersedia" : "Penuh";
+            model.addRow(new Object[]{m.getNoMeja(), m.getKapasitas() + " orang", status});
+        }
+        JTable tabel = new JTable(model);
+
+        JPanel form = new JPanel(new GridLayout(2, 2, 10, 10));
+        form.add(new JLabel("Nomor Meja:"));
+        JTextField tfMeja = new JTextField();
+        form.add(tfMeja);
+        form.add(new JLabel("Waktu Kedatangan:"));
+        JTextField tfWaktu = new JTextField();
+        tfWaktu.setToolTipText("Contoh: 19:00");
+        form.add(tfWaktu);
+
+        JPanel aksi = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
+        JButton btnBatal = buatTombol("Batal", false);
+        JButton btnKonfirmasi = buatTombol("Konfirmasi Reservasi", true);
+        aksi.add(btnBatal);
+        aksi.add(btnKonfirmasi);
+
+        btnBatal.addActionListener(ev -> dialog.dispose());
+
+        btnKonfirmasi.addActionListener(ev -> {
+            int noMeja;
+            try {
+                noMeja = Integer.parseInt(tfMeja.getText().trim());
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(dialog, "Nomor meja harus berupa angka!",
+                        "Input Salah", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            String jam = tfWaktu.getText().trim();
+            if (jam.isEmpty()) {
+                JOptionPane.showMessageDialog(dialog, "Waktu kedatangan wajib diisi!",
+                        "Input Salah", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            Meja mejaDipilih = null;
+            for (Meja m : daftarMeja) {
+                if (m.getNoMeja() == noMeja) {
+                    mejaDipilih = m;
+                    break;
                 }
+            }
+            if (mejaDipilih == null) {
+                JOptionPane.showMessageDialog(dialog, "Nomor meja tidak ditemukan!",
+                        "Gagal", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
 
-            } else if (aksi == 2) {
-                System.out.println("\n--- BOOKING MEJA ---");
-                for (Meja m : daftarMeja) {
-                    String statusM = m.getIsTersedia() ? "Tersedia" : "Penuh";
-                    System.out.println("Meja " + m.getNoMeja() + " (Kapasitas: " + m.getKapasitas() + ") - " + statusM);
+            Reservasi res = new Reservasi("RES-" + System.currentTimeMillis(), pel, mejaDipilih, jam);
+            try {
+                res.konfirmasiReservasi();
+                JOptionPane.showMessageDialog(dialog,
+                        "Reservasi berhasil!\nMeja " + mejaDipilih.getNoMeja()
+                                + " untuk " + pel.nama + " pukul " + jam,
+                        "Berhasil", JOptionPane.INFORMATION_MESSAGE);
+                dialog.dispose();
+            } catch (MejaPenuhException ex) {
+                JOptionPane.showMessageDialog(dialog, ex.getMessage(), "Gagal", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        dialog.add(new JScrollPane(tabel), BorderLayout.CENTER);
+        dialog.add(form, BorderLayout.NORTH);
+        dialog.add(aksi, BorderLayout.SOUTH);
+        dialog.setVisible(true);
+    }
+
+    // ===================== KASIR =====================
+
+    private static DefaultTableModel modelPesananKasir;
+
+    private static JPanel buatPanelKasir() {
+        JPanel panel = buatPanelDasar("Dashboard Kasir",
+                "Kelola dan proses pembayaran pesanan pelanggan");
+
+        String[] kolom = {"No", "ID Pesanan", "Pelanggan", "Status", "Total"};
+        modelPesananKasir = new DefaultTableModel(kolom, 0) {
+            @Override
+            public boolean isCellEditable(int row, int col) {
+                return false;
+            }
+        };
+        JTable tabel = new JTable(modelPesananKasir);
+
+        JPanel aksi = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        JButton btnRefresh = buatTombol("Refresh", false);
+        JButton btnBayar = buatTombol("Proses Pembayaran", true);
+        JButton btnLogout = buatTombol("Logout", false);
+        aksi.add(btnRefresh);
+        aksi.add(btnBayar);
+        aksi.add(btnLogout);
+
+        panel.add(new JScrollPane(tabel), BorderLayout.CENTER);
+        panel.add(aksi, BorderLayout.SOUTH);
+
+        Runnable refresh = () -> muatPesananKeTabel(modelPesananKasir, false);
+
+        btnRefresh.addActionListener(e -> refresh.run());
+        panel.addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override
+            public void componentShown(java.awt.event.ComponentEvent e) {
+                refresh.run();
+            }
+        });
+
+        btnBayar.addActionListener(e -> {
+            if (!(penggunaAktif instanceof Kasir ksr)) {
+                return;
+            }
+            int baris = tabel.getSelectedRow();
+            if (baris < 0) {
+                JOptionPane.showMessageDialog(frame, "Pilih pesanan yang akan dibayar!",
+                        "Peringatan", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            Pesanan pesananBayar = daftarPesananAktif.get(baris);
+            tampilkanDialogPembayaran(ksr, pesananBayar, refresh);
+        });
+
+        btnLogout.addActionListener(e -> {
+            penggunaAktif.logout();
+            navigasiKeLogin();
+        });
+
+        return panel;
+    }
+
+    private static void muatPesananKeTabel(DefaultTableModel model, boolean filterWaiter) {
+        model.setRowCount(0);
+        for (int i = 0; i < daftarPesananAktif.size(); i++) {
+            Pesanan p = daftarPesananAktif.get(i);
+            if (filterWaiter && p.getStatus() != StatusPesanan.DIPROSES
+                    && p.getStatus() != StatusPesanan.SIAP_ANTAR) {
+                continue;
+            }
+            model.addRow(new Object[]{
+                    i + 1, p.getIdPesanan(), p.getPelanggan().nama,
+                    p.getStatus(), formatRupiah(p.hitungTotal())
+            });
+        }
+    }
+
+    private static void tampilkanDialogPembayaran(Kasir ksr, Pesanan pesanan, Runnable refresh) {
+        double totalTagihan = pesanan.hitungTotal();
+
+        String[] opsi = {"Cash / Tunai", "QRIS"};
+        int metode = JOptionPane.showOptionDialog(frame,
+                "Total Tagihan: " + formatRupiah(totalTagihan) + "\nPilih metode pembayaran:",
+                "Pembayaran - " + pesanan.getIdPesanan(),
+                JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE,
+                null, opsi, opsi[0]);
+
+        if (metode == JOptionPane.CLOSED_OPTION) {
+            return;
+        }
+
+        MetodePembayaran paymentMethod = null;
+
+        if (metode == 0) {
+            String input = JOptionPane.showInputDialog(frame,
+                    "Masukkan jumlah uang pelanggan (Rp):", totalTagihan);
+            if (input == null) {
+                return;
+            }
+            try {
+                double uang = Double.parseDouble(input.trim());
+                paymentMethod = new PembayaranCash(uang);
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(frame, "Jumlah uang tidak valid!",
+                        "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+        } else if (metode == 1) {
+            paymentMethod = new PembayaranQRIS("TX-QR-" + System.currentTimeMillis());
+        }
+
+        if (paymentMethod != null) {
+            try {
+                boolean sukses = paymentMethod.prosesBayar(totalTagihan);
+                if (sukses) {
+                    ksr.updateStatusPesanan(pesanan, StatusPesanan.DIPROSES);
+                    String pesan = metode == 0
+                            ? "Pembayaran tunai berhasil!\nKembalian: "
+                            + formatRupiah(((PembayaranCash) paymentMethod).getUangDibayar() - totalTagihan)
+                            : "Pembayaran QRIS berhasil diverifikasi!";
+                    JOptionPane.showMessageDialog(frame, pesan, "Sukses", JOptionPane.INFORMATION_MESSAGE);
+                    refresh.run();
                 }
-                
-                System.out.print("Pilih Nomor Meja: ");
-                int noMeja = input.nextInt();
-                input.nextLine();
-                System.out.print("Rencana Kedatangan (Cth: 19:00): ");
-                String jam = input.nextLine();
-
-                Meja mejaDipilih = null;
-                for (Meja m : daftarMeja) {
-                    if (m.getNoMeja() == noMeja) {
-                        mejaDipilih = m;
-                        break;
-                    }
-                }
-
-                if (mejaDipilih != null) {
-                    Reservasi res = new Reservasi("RES-" + System.currentTimeMillis(), pel, mejaDipilih, jam);
-                    try {
-                        res.konfirmasiReservasi(); 
-                    } catch (MejaPenuhException e) {
-                        System.out.println("\n[GAGAL] " + e.getMessage());
-                    }
-                } else {
-                    System.out.println("Nomor meja tidak ditemukan.");
-                }
-
-            } else if (aksi == 0) {
-                pel.logout();
-                isAktif = false;
+            } catch (PembayaranGagalException ex) {
+                JOptionPane.showMessageDialog(frame, ex.getMessage(), "Pembayaran Gagal",
+                        JOptionPane.ERROR_MESSAGE);
             }
         }
     }
 
-    static void menuKasir(Scanner input, Kasir ksr) {
-        boolean isAktif = true;
-        while (isAktif) {
-            System.out.println("\n--- DASHBOARD KASIR (" + ksr.nama + ") ---");
-            System.out.println("1. Tampilkan & Proses Pembayaran Pesanan");
-            System.out.println("0. Logout");
-            System.out.print("Pilih aksi (0-1): ");
-            int aksi = input.nextInt();
-            input.nextLine();
+    // ===================== WAITER =====================
 
-            if (aksi == 1) {
-                if (daftarPesananAktif.isEmpty()) {
-                    System.out.println("Tidak ada pesanan aktif saat ini.");
-                    continue;
-                }
+    private static DefaultTableModel modelPesananWaiter;
+    private static ArrayList<Pesanan> pesananWaiterCache = new ArrayList<>();
 
-                System.out.println("\n--- DAFTAR PESANAN AKTIF ---");
-                for (int i = 0; i < daftarPesananAktif.size(); i++) {
-                    Pesanan p = daftarPesananAktif.get(i);
-                    System.out.println((i + 1) + ". ID: " + p.getIdPesanan() + " | Pelanggan: " + p.getPelanggan().nama + " | Status: " + p.getStatus() + " | Total: Rp" + p.hitungTotal());
-                }
-                
-                System.out.print("Pilih pesanan yang akan dibayar (0 untuk batal): ");
-                int pilPesanan = input.nextInt();
-                input.nextLine();
+    private static JPanel buatPanelWaiter() {
+        JPanel panel = buatPanelDasar("Dashboard Waiter",
+                "Pantau pesanan siap antar dan tandai selesai");
 
-                if (pilPesanan > 0 && pilPesanan <= daftarPesananAktif.size()) {
-                    Pesanan pesananBayar = daftarPesananAktif.get(pilPesanan - 1);
-                    double totalTagihan = pesananBayar.hitungTotal();
-
-                    System.out.println("\nTotal Tagihan: Rp" + totalTagihan);
-                    System.out.println("Metode Pembayaran:");
-                    System.out.println("1. Cash / Tunai");
-                    System.out.println("2. QRIS");
-                    System.out.print("Pilih metode (1-2): ");
-                    int metode = input.nextInt();
-                    input.nextLine();
-
-                    MetodePembayaran paymentMethod = null;
-
-                    if (metode == 1) {
-                        System.out.print("Masukkan jumlah uang pelanggan: Rp");
-                        double uang = input.nextDouble();
-                        input.nextLine();
-                        paymentMethod = new PembayaranCash(uang);
-                    } else if (metode == 2) {
-                        System.out.println("Silakan scan QRIS. Menunggu verifikasi...");
-                        paymentMethod = new PembayaranQRIS("TX-QR-" + System.currentTimeMillis());
-                    }
-
-                    if (paymentMethod != null) {
-                        try {
-                            boolean sukses = paymentMethod.prosesBayar(totalTagihan);
-                            if (sukses) {
-                                ksr.updateStatusPesanan(pesananBayar, StatusPesanan.DIPROSES);
-                            }
-                        } catch (PembayaranGagalException e) {
-                            System.out.println("\n[ERROR PEMBAYARAN] " + e.getMessage());
-                        }
-                    }
-                }
-            } else if (aksi == 0) {
-                ksr.logout();
-                isAktif = false;
+        String[] kolom = {"No", "ID Pesanan", "Pelanggan", "Status", "Detail Item"};
+        modelPesananWaiter = new DefaultTableModel(kolom, 0) {
+            @Override
+            public boolean isCellEditable(int row, int col) {
+                return false;
             }
+        };
+        JTable tabel = new JTable(modelPesananWaiter);
+
+        JTextArea detailArea = new JTextArea(6, 40);
+        detailArea.setEditable(false);
+        detailArea.setLineWrap(true);
+        detailArea.setWrapStyleWord(true);
+
+        tabel.getSelectionModel().addListSelectionListener(e -> {
+            if (e.getValueIsAdjusting()) {
+                return;
+            }
+            int baris = tabel.getSelectedRow();
+            if (baris >= 0 && baris < pesananWaiterCache.size()) {
+                Pesanan p = pesananWaiterCache.get(baris);
+                StringBuilder sb = new StringBuilder();
+                sb.append("Pelanggan: ").append(p.getPelanggan().nama).append("\n");
+                sb.append("Status: ").append(p.getStatus()).append("\n\nDetail:\n");
+                for (itemPesanan item : p.getDaftarItem()) {
+                    sb.append(" - ").append(item.getKuantitas()).append("x ")
+                            .append(item.getMenu().getNamaMenu())
+                            .append(" (").append(item.getCatatan()).append(")\n");
+                }
+                detailArea.setText(sb.toString());
+            }
+        });
+
+        JPanel aksi = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        JButton btnRefresh = buatTombol("Refresh", false);
+        JButton btnSelesai = buatTombol("Tandai Selesai", true);
+        JButton btnLogout = buatTombol("Logout", false);
+        aksi.add(btnRefresh);
+        aksi.add(btnSelesai);
+        aksi.add(btnLogout);
+
+        JPanel bawah = new JPanel(new BorderLayout());
+        bawah.add(new JLabel("Detail Pesanan Terpilih:"), BorderLayout.NORTH);
+        bawah.add(new JScrollPane(detailArea), BorderLayout.CENTER);
+        bawah.add(aksi, BorderLayout.SOUTH);
+
+        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT,
+                new JScrollPane(tabel), bawah);
+        split.setResizeWeight(0.55);
+        split.setDividerLocation(260);
+
+        panel.add(split, BorderLayout.CENTER);
+
+        Runnable refresh = () -> muatPesananWaiter();
+
+        btnRefresh.addActionListener(e -> refresh.run());
+        panel.addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override
+            public void componentShown(java.awt.event.ComponentEvent e) {
+                refresh.run();
+            }
+        });
+
+        btnSelesai.addActionListener(e -> {
+            if (!(penggunaAktif instanceof Waiter wtr)) {
+                return;
+            }
+            if (pesananWaiterCache.isEmpty()) {
+                JOptionPane.showMessageDialog(frame, "Belum ada pesanan siap antar.",
+                        "Info", JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+            int baris = tabel.getSelectedRow();
+            if (baris < 0) {
+                JOptionPane.showMessageDialog(frame, "Pilih pesanan terlebih dahulu!",
+                        "Peringatan", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            Pesanan p = pesananWaiterCache.get(baris);
+            if (p.getStatus() != StatusPesanan.DIPROSES && p.getStatus() != StatusPesanan.SIAP_ANTAR) {
+                JOptionPane.showMessageDialog(frame, "Pesanan ini belum siap diantar!",
+                        "Peringatan", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            wtr.updateStatusSelesai(p);
+            JOptionPane.showMessageDialog(frame,
+                    "Pesanan " + p.getIdPesanan() + " telah diserahkan (SELESAI).",
+                    "Sukses", JOptionPane.INFORMATION_MESSAGE);
+            refresh.run();
+        });
+
+        btnLogout.addActionListener(e -> {
+            penggunaAktif.logout();
+            navigasiKeLogin();
+        });
+
+        return panel;
+    }
+
+    private static void muatPesananWaiter() {
+        modelPesananWaiter.setRowCount(0);
+        pesananWaiterCache.clear();
+        for (Pesanan p : daftarPesananAktif) {
+            if (p.getStatus() == StatusPesanan.DIPROSES || p.getStatus() == StatusPesanan.SIAP_ANTAR) {
+                pesananWaiterCache.add(p);
+                StringBuilder items = new StringBuilder();
+                for (itemPesanan item : p.getDaftarItem()) {
+                    if (items.length() > 0) {
+                        items.append(", ");
+                    }
+                    items.append(item.getKuantitas()).append("x ").append(item.getMenu().getNamaMenu());
+                }
+                modelPesananWaiter.addRow(new Object[]{
+                        pesananWaiterCache.size(), p.getIdPesanan(),
+                        p.getPelanggan().nama, p.getStatus(), items.toString()
+                });
+            }
+        }
+        if (pesananWaiterCache.isEmpty()) {
+            modelPesananWaiter.addRow(new Object[]{"-", "-", "-", "-", "Belum ada pesanan siap antar"});
         }
     }
 
-static void menuWaiter(Scanner input, Waiter wtr) {
-        boolean isAktif = true;
-        while (isAktif) {
-            System.out.println("\n--- DASHBOARD WAITER (" + wtr.nama + ") ---");
-            System.out.println("1. Lihat Daftar Pesanan (Masak / Siap Antar)");
-            System.out.println("2. Tandai Pesanan Menjadi SELESAI");
-            System.out.println("0. Logout");
-            System.out.print("Pilih aksi (0-2): ");
-            int aksi = input.nextInt();
-            input.nextLine();
+    // ===================== OWNER =====================
 
-            if (aksi == 1) {
-                wtr.lihatPesananSiapAntar(daftarPesananAktif);
-            } else if (aksi == 2) {
-                System.out.println("\n--- PILIH PESANAN YANG SUDAH DIANTAR ---");
-                for (int i = 0; i < daftarPesananAktif.size(); i++) {
-                    Pesanan p = daftarPesananAktif.get(i);
-                    if (p.getStatus() == StatusPesanan.DIPROSES || p.getStatus() == StatusPesanan.SIAP_ANTAR) {
-                        System.out.println((i + 1) + ". ID: " + p.getIdPesanan() + " | Pelanggan: " + p.getPelanggan().nama);
-                    }
-                }
-                
-                System.out.print("Pilih nomor urut pesanan (0 batal): ");
-                int pil = input.nextInt();
-                input.nextLine();
-                if (pil > 0 && pil <= daftarPesananAktif.size()) {
-                    wtr.updateStatusSelesai(daftarPesananAktif.get(pil - 1));
-                }
-            } else if (aksi == 0) {
-                wtr.logout();
-                isAktif = false;
+    private static JPanel buatPanelOwner() {
+        JPanel panel = buatPanelDasar("Dashboard Owner",
+                "Pantau laporan keuangan dan aktivitas meja");
+
+        JPanel konten = new JPanel(new GridLayout(1, 2, 10, 0));
+
+        JPanel kartuLaporan = buatKartuAksi("Laporan Transaksi",
+                "Lihat daftar transaksi sukses dan total pendapatan kafe.");
+        JButton btnLaporan = buatTombol("Lihat Laporan", true);
+        kartuLaporan.add(btnLaporan, BorderLayout.SOUTH);
+
+        JPanel kartuMeja = buatKartuAksi("Rekap Aktivitas Meja",
+                "Pantau meja yang kosong, dipakai, atau sedang dibooking.");
+        JButton btnMeja = buatTombol("Lihat Rekap Meja", true);
+        kartuMeja.add(btnMeja, BorderLayout.SOUTH);
+
+        konten.add(kartuLaporan);
+        konten.add(kartuMeja);
+
+        JTextArea areaLaporan = new JTextArea(12, 50);
+        areaLaporan.setEditable(false);
+        JScrollPane scrollLaporan = new JScrollPane(areaLaporan);
+        scrollLaporan.setBorder(BorderFactory.createTitledBorder("Hasil Laporan"));
+
+        JPanel tengah = new JPanel(new BorderLayout(0, 10));
+        tengah.add(konten, BorderLayout.NORTH);
+        tengah.add(scrollLaporan, BorderLayout.CENTER);
+
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JButton btnLogout = buatTombol("Logout", false);
+        footer.add(btnLogout);
+
+        panel.add(tengah, BorderLayout.CENTER);
+        panel.add(footer, BorderLayout.SOUTH);
+
+        btnLaporan.addActionListener(e -> {
+            if (penggunaAktif instanceof Owner own) {
+                areaLaporan.setText(buatTeksLaporanTransaksi(own));
             }
-        }
+        });
+
+        btnMeja.addActionListener(e -> {
+            if (penggunaAktif instanceof Owner own) {
+                areaLaporan.setText(buatTeksRekapMeja(own));
+            }
+        });
+
+        btnLogout.addActionListener(ev -> {
+            penggunaAktif.logout();
+            navigasiKeLogin();
+        });
+
+        return panel;
     }
 
-    static void menuOwner(Scanner input, Owner own) {
-        boolean isAktif = true;
-        while (isAktif) {
-            System.out.println("\n--- DASHBOARD OWNER (" + own.nama + ") ---");
-            System.out.println("1. Lihat Laporan Transaksi");
-            System.out.println("2. Lihat Rekap Aktivitas Meja");
-            System.out.println("0. Logout");
-            System.out.print("Pilih aksi (0-2): ");
-            int aksi = input.nextInt();
-            input.nextLine();
+    private static String buatTeksLaporanTransaksi(Owner own) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("--- LAPORAN KEUANGAN KAFE ---\n\n");
+        double totalPendapatan = 0;
+        int jumlahTransaksi = 0;
 
-            if (aksi == 1) {
-                own.lihatLaporanTransaksi(daftarPesananAktif); 
-            } else if (aksi == 2) {
-                own.lihatRekapAktivitas(daftarMeja);
-            } else if (aksi == 0) {
-                own.logout();
-                isAktif = false;
+        for (Pesanan p : daftarPesananAktif) {
+            if (p.getStatus() != StatusPesanan.DITERIMA) {
+                sb.append("ID: ").append(p.getIdPesanan())
+                        .append(" | Pelanggan: ").append(p.getPelanggan().nama)
+                        .append(" | Pemasukan: ").append(formatRupiah(p.hitungTotal())).append("\n");
+                totalPendapatan += p.hitungTotal();
+                jumlahTransaksi++;
             }
         }
+        sb.append("\n---------------------------------\n");
+        sb.append("Total Transaksi Sukses : ").append(jumlahTransaksi).append("\n");
+        sb.append("Total Pendapatan Kas   : ").append(formatRupiah(totalPendapatan)).append("\n");
+
+        own.lihatLaporanTransaksi(daftarPesananAktif);
+        return sb.toString();
+    }
+
+    private static String buatTeksRekapMeja(Owner own) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("--- REKAP AKTIVITAS MEJA ---\n\n");
+        int mejaTerpakai = 0;
+
+        for (Meja m : daftarMeja) {
+            String status = m.getIsTersedia() ? "Kosong" : "Dipakai / Dibooking";
+            sb.append("Meja ").append(m.getNoMeja())
+                    .append(" (Kapasitas ").append(m.getKapasitas()).append(" orang) -> ")
+                    .append(status).append("\n");
+            if (!m.getIsTersedia()) {
+                mejaTerpakai++;
+            }
+        }
+        sb.append("\nTotal Meja Terpakai: ").append(mejaTerpakai)
+                .append(" dari ").append(daftarMeja.size()).append(" meja.\n");
+
+        own.lihatRekapAktivitas(daftarMeja);
+        return sb.toString();
     }
 }
